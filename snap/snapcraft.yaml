@@ -36,6 +36,8 @@ apps:
       - network
       - network-bind
       - opengl # grants also CUDA based GPU access
+    environment:
+      LD_LIBRARY_PATH: "$SNAP/lib/ollama:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:/var/lib/snapd/lib/gl${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   listener:
     command: bin/snap_launcher.sh serve
     daemon: simple
@@ -50,6 +52,7 @@ apps:
       - opengl
     environment:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      LD_LIBRARY_PATH: "$SNAP/lib/ollama:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:/var/lib/snapd/lib/gl${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 parts:
   launcher:
@@ -82,12 +85,19 @@ parts:
     build-snaps:
       - go/stable
     build-environment:
-      - LD_LIBRARY_PATH: "/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/nvidia/:/usr/local/cuda-12.8/compat/${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      - LD_LIBRARY_PATH: "/usr/lib/${CRAFT_ARCH_TRIPLET_BUILD_FOR}/nvidia/:/usr/local/cuda/lib64/${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      - PATH: "/usr/local/cuda/bin${PATH:+:$PATH}"
     override-pull: |
       craftctl default
       last_committed_tag="$(git describe --tags --abbrev=0)"
       last_committed_tag_ver="$(echo ${last_committed_tag} | sed 's/v//')"
       craftctl set version="$(git describe --tags | sed 's/v//')"
+    override-build: |
+      cmake -B build
+      cmake --build build --config Release
+      mkdir -p $CRAFT_PART_INSTALL/lib/ollama
+      cp -rp build/lib/ollama/* $CRAFT_PART_INSTALL/lib/ollama
+      craftctl default
 
   libs:
     plugin: nil
@@ -96,5 +106,8 @@ parts:
       - on amd64:
         - libcublas-12-8
         - cuda-libraries-12-8
+        - libcudart12
+        - libcublaslt12
+        - libcublas12
     stage:
       - -usr/local
