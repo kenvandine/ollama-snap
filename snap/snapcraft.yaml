@@ -13,7 +13,23 @@ platforms:
   amd64:
   arm64:
 
+layout:
+  /opt/amdgpu/share/libdrm/amdgpu.ids:
+    bind-file: $SNAP/opt/amdgpu/share/libdrm/amdgpu.ids
+  /usr/share/misc/pci.ids:
+    bind-file: $SNAP/usr/share/misc/pci.ids
+
 apps:
+  rocminfo:
+    command: usr/bin/rocminfo
+    plugs:
+      - opengl # grants also CUDA based GPU access
+    environment:
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      LD_LIBRARY_PATH: "$SNAP/lib/ollama:$SNAP/lib/ollama/rocm:/var/lib/snapd/lib/gl${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      ROCBLAS_TENSILE_LIBPATH: "$SNAP/lib/ollama/rocm/rocblas/library"
+      ROCM_PATH: "$SNAP/usr"
+
   ollama:
     command: bin/snap_launcher.sh
     plugs:
@@ -24,6 +40,8 @@ apps:
       - opengl # grants also CUDA based GPU access
     environment:
       LD_LIBRARY_PATH: "$SNAP/lib/ollama:/var/lib/snapd/lib/gl${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      ROCM_PATH: "$SNAP/usr"
+      #ROCM_PATH: "$SNAP/lib/ollama/rocm"
   listener:
     command: bin/snap_launcher.sh serve
     daemon: simple
@@ -39,6 +57,11 @@ apps:
     environment:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
       LD_LIBRARY_PATH: "$SNAP/lib/ollama:/var/lib/snapd/lib/gl${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      ROCBLAS_TENSILE_LIBPATH: "$SNAP/lib/ollama/rocm/rocblas/library"
+      ROCM_PATH: "$SNAP/usr"
+      #ROCM_PATH: "$SNAP/lib/ollama/rocm"
+      HSA_OVERRIDE_GFX_VERSION: 10.3.0
+      OLLAMA_NEW_ESTIMATES: 1
 
 parts:
   launcher:
@@ -52,3 +75,33 @@ parts:
     source: https://github.com/ollama/ollama/releases/download/$CRAFT_PROJECT_VERSION/ollama-linux-$CRAFT_ARCH_BUILD_FOR.tgz
     prime:
       - -lib/ollama/cuda_v11
+  ollama-rocm:
+    plugin: nil
+    source-type: tar
+    build-packages:
+      - curl
+    override-pull: |
+      set -ex
+      rm -rf $CRAFT_PART_SRC/*
+
+      if [[ $CRAFT_ARCH_BUILD_FOR == "amd64" ]]; then
+        curl -LO --retry-connrefused --retry 10 https://github.com/ollama/ollama/releases/download/$CRAFT_PROJECT_VERSION/ollama-linux-$CRAFT_ARCH_BUILD_FOR-rocm.tgz
+      else
+        echo "Unsupported arch"
+        exit 0
+      fi
+
+      tar xvf ollama-linux*rocm.tgz
+      rm -f *tgz
+    override-build: |
+      set -ex
+      rm -rf $CRAFT_PART_INSTALL/*
+      mkdir -p $CRAFT_PART_INSTALL/lib/ollama
+      cp -rp $CRAFT_PART_SRC/lib/ollama/rocm $CRAFT_PART_INSTALL/lib/ollama/
+
+  tools:
+    plugin: nil
+    stage-packages:
+      - rocminfo
+      - rocm-smi
+      - libdrm-common
