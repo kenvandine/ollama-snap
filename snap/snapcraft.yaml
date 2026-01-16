@@ -38,7 +38,7 @@ apps:
       - opengl
     environment:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
-      LD_LIBRARY_PATH: "$SNAP/lib/ollama:/var/lib/snapd/lib/gl${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+      LD_LIBRARY_PATH: "$SNAP/lib/ollama:$SNAP/lib/ollama/vulkan:$SNAP/lib/ollama/rocm:/var/lib/snapd/lib/gl${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 parts:
   launcher:
@@ -55,6 +55,8 @@ parts:
     override-pull: |
       curl -Lo ollama.tar.zst https://github.com/ollama/ollama/releases/download/$CRAFT_PROJECT_VERSION/ollama-linux-$CRAFT_ARCH_BUILD_FOR.tar.zst 2>/dev/null
       tar xf ollama.tar.zst
+      curl -Lo rocm.tar.zst https://github.com/ollama/ollama/releases/download/$CRAFT_PROJECT_VERSION/ollama-linux-$CRAFT_ARCH_BUILD_FOR-rocm.tar.zst 2>/dev/null
+      tar xf rocm.tar.zst
       mv {bin,lib} $CRAFT_PART_INSTALL/
     prime:
       - -lib/ollama/cuda_v11
